@@ -7,7 +7,7 @@ let adminAuthToken;
 let adminUser;
 let regularUser;
 let newFranchise;
-let badFranchise;
+let regUserFranchise;
 let newStore;
 
 async function createAdminUser() {
@@ -35,24 +35,29 @@ beforeAll(async () => {
     email: "reg@test.com",
     password: "a",
   };
+
   newStore = await {
     id: randomName(),
     name: randomName(),
     totalRevenue: 1000,
   };
+
   regularUser.email = Math.random().toString(36).substring(2, 12) + "@test.com";
   adminUser = await createAdminUser();
-  console.log(adminUser);
+  // console.log(adminUser);
+
   newFranchise = {
     name: randomName(),
     admins: [{ email: adminUser.email }],
-    stores: [{ id: "123", name: randomName(), totalRevenue: 1000 }],
+    stores: [{ id: randomName(), name: randomName(), totalRevenue: 1000 }],
   };
-  badFranchise = {
+
+  regUserFranchise = {
     name: randomName(),
     admins: [{ email: regularUser.email }],
-    stores: [{ id: "123", name: randomName(), totalRevenue: 1000 }],
+    stores: [{ id: randomName(), name: randomName(), totalRevenue: 1000 }],
   };
+
   const userLoginRes = await request(app).post("/api/auth").send(regularUser);
   const loginRes = await request(app).put("/api/auth").send(adminUser);
   adminAuthToken = loginRes.body.token;
@@ -91,10 +96,36 @@ test("Get Franchises", async () => {
   expect(getFranchisesRes.status).toBe(200);
 });
 
-test("Create and Delete Store", async () => {
-  const regRes2 = await request(app)
-    .post(`/api/franchise/${newFranchise.id}/store`)
+test("Create, Get, and Delete Store", async () => {
+  const regFranRes = await request(app)
+    .post("/api/franchise")
+    .set("Authorization", `Bearer ${adminAuthToken}`)
+    .send(regUserFranchise);
+  console.log(regFranRes.body);
+  console.log("Franchise Id: ", regFranRes.body.id);
+  expect(regFranRes.status).toBe(200);
+
+  const getFranchisesRes = await request(app)
+    .get(`/api/franchise/${regFranRes.body.id}`)
+    .set("Authorization", `Bearer ${adminAuthToken}`);
+  expect(getFranchisesRes.status).toBe(200);
+
+  const createStoreRes = await request(app)
+    .post(`/api/franchise/${regFranRes.body.id}/store`)
     .set("Authorization", `Bearer ${adminAuthToken}`)
     .send(newStore);
-  expect(newStore.status).toBe(401);
+  console.log(createStoreRes.body);
+  expect(createStoreRes.status).toBe(200);
+
+  const deleteStoreRes = await request(app)
+    .delete(`/api/franchise/${regFranRes.body.id}/store/${newStore.id}`)
+    .set("Authorization", `Bearer ${adminAuthToken}`);
+  console.log(deleteStoreRes.body);
+  expect(deleteStoreRes.status).toBe(200);
+
+  const deleteFranchiseRes = await request(app)
+    .delete(`/api/franchise/${regFranRes.body.id}`)
+    .set("Authorization", `Bearer ${adminAuthToken}`);
+  console.log(deleteFranchiseRes.body);
+  expect(deleteFranchiseRes.status).toBe(200);
 });
