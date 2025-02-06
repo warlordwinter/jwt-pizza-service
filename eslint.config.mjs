@@ -8,7 +8,6 @@ export default [
     languageOptions: {
       sourceType: "commonjs",
       globals: {
-        ...globals.browser,
         ...globals.node, // Add Node.js globals
         ...globals.jest, // Add Jest globals
       },

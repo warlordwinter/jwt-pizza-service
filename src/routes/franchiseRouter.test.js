@@ -4,6 +4,7 @@ const { Role, DB } = require("../database/database.js");
 
 //Anytime you create a test store. Create a global variable and init before all.
 let adminAuthToken;
+let regularAuthToken;
 let adminUser;
 let regularUser;
 let newFranchise;
