@@ -1,0 +1,7 @@
+{
+    "metrics": {
+        "source": "jwt-pizza-service-dev",
+        "url": "https://influx-prod-13-prod-us-east-0.grafana.net/api/v1/push/influx/write",
+        "apiKey": "2222222:glc_111111111111111111111111111111111111111111="
+    }
+}
