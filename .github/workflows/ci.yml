@@ -111,32 +111,6 @@ jobs:
           aws-region: us-east-1
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT }}:role/${{ secrets.CI_IAM_ROLE }}
 
-      - name: Checkout repo for CloudFormation templates
-        uses: actions/checkout@v4
-
-      - name: Deploy RDS Infrastructure
-        run: |
-          aws cloudformation deploy \
-            --template-file cloudFormation/rds.json \
-            --stack-name jwt-pizza-service-rds \
-            --parameter-overrides \
-              DBUsername=${{ secrets.DB_USERNAME }} \
-              DBPassword=${{ secrets.DB_PASSWORD }} \
-              VpcID=${{ secrets.VPC_ID }} \
-              SubnetIDs=${{ secrets.SUBNET_IDS }} \
-              SecurityGroupIDs=${{ secrets.SECURITY_GROUP_IDS }} \
-            --capabilities CAPABILITY_IAM \
-            --no-fail-on-empty-changeset
-
-      - name: Get RDS Endpoint
-        id: rds-info
-        run: |
-          DB_ENDPOINT=$(aws cloudformation describe-stacks \
-            --stack-name jwt-pizza-service-rds \
-            --query 'Stacks[0].Outputs[?OutputKey==`DBEndpoint`].OutputValue' \
-            --output text)
-          echo "db_endpoint=$DB_ENDPOINT" >> $GITHUB_OUTPUT
-
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
