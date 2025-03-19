@@ -8,6 +8,11 @@ const metrics = require("./metrics.js");
 
 metrics.startSystemMetricsCollection();
 
+// Track available endpoints
+metrics.updateAvailableEndpoints("auth", authRouter.endpoints.length);
+metrics.updateAvailableEndpoints("order", orderRouter.endpoints.length);
+metrics.updateAvailableEndpoints("franchise", franchiseRouter.endpoints.length);
+
 const app = express();
 
 // Add request tracking middleware early to catch ALL requests

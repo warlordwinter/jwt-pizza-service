@@ -1,8 +1,5 @@
 const config = require("./config");
 const os = require("os");
-const { authRouter } = require("./routes/authRouter");
-const { orderRouter } = require("./routes/orderRouter");
-const { franchiseRouter } = require("./routes/franchiseRouter");
 
 const requests = {};
 
@@ -31,12 +28,20 @@ const requestTracker = (req, res, next) => {
   next();
 };
 
+// Track available endpoints
+let availableEndpoints = {};
+
+function updateAvailableEndpoints(router, count) {
+  availableEndpoints[router] = count;
+}
+
 function track(endpoint) {
   return (req, res, next) => {
     // Only track endpoint-specific requests, method counting is now handled globally
     requests[endpoint] = (requests[endpoint] || 0) + 1;
     requests["total"] = (requests["total"] || 0) + 1;
-    console.log(`Endpoint tracked: ${endpoint}, count: ${requests[endpoint]}`);
+    // console.log(`Endpoint tracked: ${endpoint}, count: ${requests[endpoint]}`);
+    console.log(`Total requests: ${requests["total"]}`);
     next();
   };
 }
@@ -64,6 +69,19 @@ function incrementMethodCount(method) {
   if (methodCounts.hasOwnProperty(method)) {
     methodCounts[method]++;
     console.log(`Incremented ${method} count to ${methodCounts[method]}`);
+  }
+}
+
+const authenticationCounts = {
+  success: 0,
+  failure: 0,
+};
+
+function incrementAuthenticationCount(success) {
+  if (success) {
+    authenticationCounts.success++;
+  } else {
+    authenticationCounts.failure++;
   }
 }
 
@@ -100,6 +118,22 @@ function getMemoryUsagePercentage() {
   return Math.round(memoryUsage);
 }
 
+// Add active users tracking
+const userMetrics = {
+  activeUsers: new Set(), // Using Set to prevent duplicate counting
+  totalActiveCount: 0,
+};
+
+function trackUserActivity(userId, isActive) {
+  if (isActive) {
+    userMetrics.activeUsers.add(userId);
+  } else {
+    userMetrics.activeUsers.delete(userId);
+  }
+  userMetrics.totalActiveCount = userMetrics.activeUsers.size;
+  console.log(`Active users count: ${userMetrics.totalActiveCount}`);
+}
+
 // Function to collect and send system metrics
 function startSystemMetricsCollection(interval = 10000) {
   // Reset counts every 60 seconds
@@ -123,6 +157,11 @@ function startSystemMetricsCollection(interval = 10000) {
         type: "system",
       });
 
+      // Send active users metric
+      sendMetricToGrafana("active_users", userMetrics.totalActiveCount, {
+        type: "users",
+      });
+
       // Send method-specific metrics with current counts
       const currentCounts = getMethodCounts();
       Object.entries(currentCounts).forEach(([method, count]) => {
@@ -134,20 +173,8 @@ function startSystemMetricsCollection(interval = 10000) {
       });
       resetMethodCounts();
 
-      // Try to get endpoints safely
-      let endpoints = {};
-      try {
-        endpoints = {
-          auth: authRouter?.endpoints?.length || 0,
-          order: orderRouter?.endpoints?.length || 0,
-          franchise: franchiseRouter?.endpoints?.length || 0,
-        };
-      } catch (err) {
-        console.log("Note: Some routers not initialized yet");
-      }
-
-      // Send endpoint metrics only if we have data
-      Object.entries(endpoints).forEach(([router, count]) => {
+      // Send endpoint metrics
+      Object.entries(availableEndpoints).forEach(([router, count]) => {
         if (count > 0) {
           sendMetricToGrafana("available_endpoints", count, {
             router,
@@ -242,5 +269,11 @@ module.exports = {
   getSystemMetrics: () => ({ ...systemMetrics }),
   getMethodCounts,
   incrementMethodCount,
-  requestTracker, // Export the new middleware
+  requestTracker,
+  trackUserActivity,
+  getUserMetrics: () => ({
+    activeCount: userMetrics.totalActiveCount,
+    activeUsers: Array.from(userMetrics.activeUsers),
+  }),
+  updateAvailableEndpoints,
 };
