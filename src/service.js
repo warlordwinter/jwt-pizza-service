@@ -9,6 +9,10 @@ const metrics = require("./metrics.js");
 metrics.startSystemMetricsCollection();
 
 const app = express();
+
+// Add request tracking middleware early to catch ALL requests
+app.use(metrics.requestTracker);
+
 app.use(express.json());
 app.use(setAuthUser);
 app.use((req, res, next) => {

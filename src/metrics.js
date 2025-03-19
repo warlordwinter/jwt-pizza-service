@@ -1,5 +1,8 @@
 const config = require("./config");
 const os = require("os");
+const { authRouter } = require("./routes/authRouter");
+const { orderRouter } = require("./routes/orderRouter");
+const { franchiseRouter } = require("./routes/franchiseRouter");
 
 const requests = {};
 
@@ -11,12 +14,57 @@ const systemMetrics = {
 
 let lastCpuInfo = os.cpus();
 
+// Add request tracking middleware
+const requestTracker = (req, res, next) => {
+  // Track method counts
+  const method = req.method.toUpperCase();
+  if (methodCounts.hasOwnProperty(method)) {
+    incrementMethodCount(method);
+    console.log(`Global request tracked: ${method} ${req.path}`);
+  }
+
+  // Track response completion
+  res.on("finish", () => {
+    console.log(`Request completed: ${method} ${req.path} ${res.statusCode}`);
+  });
+
+  next();
+};
+
 function track(endpoint) {
   return (req, res, next) => {
-    requests[endpoint] = (requests[endpoint] || 0) + 1; // Increment the count for the given endpoint
-    requests["total"] = (requests["total"] || 0) + 1; // Increment the total count
-    next(); // Move to the next middleware or route handler
+    // Only track endpoint-specific requests, method counting is now handled globally
+    requests[endpoint] = (requests[endpoint] || 0) + 1;
+    requests["total"] = (requests["total"] || 0) + 1;
+    console.log(`Endpoint tracked: ${endpoint}, count: ${requests[endpoint]}`);
+    next();
   };
+}
+
+const methodCounts = {
+  GET: 0,
+  POST: 0,
+  PUT: 0,
+  DELETE: 0,
+};
+
+function resetMethodCounts() {
+  methodCounts.GET = 0;
+  methodCounts.POST = 0;
+  methodCounts.PUT = 0;
+  methodCounts.DELETE = 0;
+  console.log("Method counts reset:", methodCounts);
+}
+
+function getMethodCounts() {
+  return { ...methodCounts }; // Return a copy to prevent direct modification
+}
+
+function incrementMethodCount(method) {
+  if (methodCounts.hasOwnProperty(method)) {
+    methodCounts[method]++;
+    console.log(`Incremented ${method} count to ${methodCounts[method]}`);
+  }
 }
 
 function getCpuUsagePercentage() {
@@ -54,6 +102,9 @@ function getMemoryUsagePercentage() {
 
 // Function to collect and send system metrics
 function startSystemMetricsCollection(interval = 10000) {
+  // Reset counts every 60 seconds
+  setInterval(resetMethodCounts, 60000);
+
   setInterval(() => {
     try {
       // Update current metrics
@@ -72,18 +123,37 @@ function startSystemMetricsCollection(interval = 10000) {
         type: "system",
       });
 
-      // Send endpoint metrics
-      const endpoints = {
-        auth: authRouter?.endpoints?.length || 0,
-        order: orderRouter?.endpoints?.length || 0,
-        franchise: franchiseRouter?.endpoints?.length || 0,
-      };
-
-      Object.entries(endpoints).forEach(([router, count]) => {
-        sendMetricToGrafana("available_endpoints", count, {
-          router,
-          type: "endpoint",
+      // Send method-specific metrics with current counts
+      const currentCounts = getMethodCounts();
+      Object.entries(currentCounts).forEach(([method, count]) => {
+        console.log(`Sending ${method} count:`, count);
+        sendMetricToGrafana("http_method_requests", count, {
+          method: method,
+          type: "method",
         });
+      });
+      resetMethodCounts();
+
+      // Try to get endpoints safely
+      let endpoints = {};
+      try {
+        endpoints = {
+          auth: authRouter?.endpoints?.length || 0,
+          order: orderRouter?.endpoints?.length || 0,
+          franchise: franchiseRouter?.endpoints?.length || 0,
+        };
+      } catch (err) {
+        console.log("Note: Some routers not initialized yet");
+      }
+
+      // Send endpoint metrics only if we have data
+      Object.entries(endpoints).forEach(([router, count]) => {
+        if (count > 0) {
+          sendMetricToGrafana("available_endpoints", count, {
+            router,
+            type: "endpoint",
+          });
+        }
       });
 
       // Send request metrics
@@ -170,4 +240,7 @@ module.exports = {
   track,
   startSystemMetricsCollection,
   getSystemMetrics: () => ({ ...systemMetrics }),
+  getMethodCounts,
+  incrementMethodCount,
+  requestTracker, // Export the new middleware
 };
