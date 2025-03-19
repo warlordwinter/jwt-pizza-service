@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - d8
   workflow_dispatch:
 
 jobs:
