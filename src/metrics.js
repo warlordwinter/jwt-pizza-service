@@ -1,37 +1,20 @@
 const config = require("./config");
 const os = require("os");
+const fetch = require("node-fetch"); // Add this if using Node.js < 18
 
 const requests = {};
 
 function getCpuUsagePercentage() {
   const cpuUsage = os.loadavg()[0] / os.cpus().length;
-  return cpuUsage.toFixed(2) * 100;
+  return Number((cpuUsage * 100).toFixed(2)); // Ensure it's a number
 }
 
 function getMemoryUsagePercentage() {
   const totalMemory = os.totalmem();
   const freeMemory = os.freemem();
   const usedMemory = totalMemory - freeMemory;
-  const memoryUsage = (usedMemory / totalMemory) * 100;
-  return memoryUsage.toFixed(2);
+  return Number(((usedMemory / totalMemory) * 100).toFixed(2)); // Ensure it's a number
 }
-
-function track(endpoint) {
-  return (req, res, next) => {
-    requests[endpoint] = (requests[endpoint] || 0) + 1; // Increment the count for the given endpoint
-    requests["total"] = (requests["total"] || 0) + 1; // Increment the total count
-    next(); // Move to the next middleware or route handler
-  };
-}
-
-// This will periodically send metrics to Grafana
-const timer = setInterval(() => {
-  Object.keys(requests).forEach((endpoint) => {
-    requests["memory"] = getMemoryUsagePercentage();
-    requests["cpu"] = getCpuUsagePercentage();
-    sendMetricToGrafana("requests", requests[endpoint], { endpoint });
-  });
-}, 10000);
 
 function sendMetricToGrafana(metricName, metricValue, attributes) {
   attributes = { ...attributes, source: config.source };
@@ -49,8 +32,11 @@ function sendMetricToGrafana(metricName, metricValue, attributes) {
                   dataPoints: [
                     {
                       asInt: metricValue,
-                      timeUnixNano: Date.now() * 1000000,
-                      attributes: [],
+                      timeUnixNano: Date.now() * 1_000_000, // Ensuring nanosecond timestamp
+                      attributes: Object.keys(attributes).map((key) => ({
+                        key: key,
+                        value: { stringValue: attributes[key] },
+                      })),
                     },
                   ],
                   aggregationTemporality: "AGGREGATION_TEMPORALITY_CUMULATIVE",
@@ -64,16 +50,7 @@ function sendMetricToGrafana(metricName, metricValue, attributes) {
     ],
   };
 
-  Object.keys(attributes).forEach((key) => {
-    metric.resourceMetrics[0].scopeMetrics[0].metrics[0].sum.dataPoints[0].attributes.push(
-      {
-        key: key,
-        value: { stringValue: attributes[key] },
-      }
-    );
-  });
-
-  fetch(`${config.url}`, {
+  fetch(config.url, {
     method: "POST",
     body: JSON.stringify(metric),
     headers: {
@@ -92,5 +69,23 @@ function sendMetricToGrafana(metricName, metricValue, attributes) {
       console.error("Error pushing metrics:", error);
     });
 }
+
+function track(endpoint) {
+  return (req, res, next) => {
+    requests[endpoint] = (requests[endpoint] || 0) + 1; // Increment per-endpoint count
+    requests["total"] = (requests["total"] || 0) + 1; // Increment total request count
+    next();
+  };
+}
+
+// Periodically send metrics to Grafana
+const timer = setInterval(() => {
+  sendMetricToGrafana("memory_usage", getMemoryUsagePercentage(), {});
+  sendMetricToGrafana("cpu_usage", getCpuUsagePercentage(), {});
+
+  Object.keys(requests).forEach((endpoint) => {
+    sendMetricToGrafana("requests", requests[endpoint], { endpoint });
+  });
+}, 10000);
 
 module.exports = { track };
