@@ -75,13 +75,21 @@ function incrementMethodCount(method) {
 const authenticationCounts = {
   success: 0,
   failure: 0,
+  total: 0,
 };
 
 function incrementAuthenticationCount(success) {
+  authenticationCounts.total++;
   if (success) {
     authenticationCounts.success++;
+    console.log(
+      `Authentication success. Total successes: ${authenticationCounts.success}`
+    );
   } else {
     authenticationCounts.failure++;
+    console.log(
+      `Authentication failure. Total failures: ${authenticationCounts.failure}`
+    );
   }
 }
 
@@ -160,6 +168,30 @@ function startSystemMetricsCollection(interval = 10000) {
       // Send active users metric
       sendMetricToGrafana("active_users", userMetrics.totalActiveCount, {
         type: "users",
+      });
+
+      // Send authentication metrics
+      sendMetricToGrafana(
+        "auth_attempts_success",
+        authenticationCounts.success,
+        {
+          type: "auth",
+          status: "success",
+        }
+      );
+
+      sendMetricToGrafana(
+        "auth_attempts_failure",
+        authenticationCounts.failure,
+        {
+          type: "auth",
+          status: "failure",
+        }
+      );
+
+      sendMetricToGrafana("auth_attempts_total", authenticationCounts.total, {
+        type: "auth",
+        status: "total",
       });
 
       // Send method-specific metrics with current counts
@@ -271,9 +303,11 @@ module.exports = {
   incrementMethodCount,
   requestTracker,
   trackUserActivity,
+  incrementAuthenticationCount,
   getUserMetrics: () => ({
     activeCount: userMetrics.totalActiveCount,
     activeUsers: Array.from(userMetrics.activeUsers),
   }),
+  getAuthMetrics: () => ({ ...authenticationCounts }),
   updateAvailableEndpoints,
 };
