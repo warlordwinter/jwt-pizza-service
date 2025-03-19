@@ -72,6 +72,20 @@ function startSystemMetricsCollection(interval = 10000) {
         type: "system",
       });
 
+      // Send endpoint metrics
+      const endpoints = {
+        auth: authRouter?.endpoints?.length || 0,
+        order: orderRouter?.endpoints?.length || 0,
+        franchise: franchiseRouter?.endpoints?.length || 0,
+      };
+
+      Object.entries(endpoints).forEach(([router, count]) => {
+        sendMetricToGrafana("available_endpoints", count, {
+          router,
+          type: "endpoint",
+        });
+      });
+
       // Send request metrics
       Object.entries(requests).forEach(([endpoint, count]) => {
         sendMetricToGrafana("http_requests", count, {
