@@ -1,6 +1,20 @@
 const config = require("./config");
+const os = require("os");
 
 const requests = {};
+
+function getCpuUsagePercentage() {
+  const cpuUsage = os.loadavg()[0] / os.cpus().length;
+  return cpuUsage.toFixed(2) * 100;
+}
+
+function getMemoryUsagePercentage() {
+  const totalMemory = os.totalmem();
+  const freeMemory = os.freemem();
+  const usedMemory = totalMemory - freeMemory;
+  const memoryUsage = (usedMemory / totalMemory) * 100;
+  return memoryUsage.toFixed(2);
+}
 
 function track(endpoint) {
   return (req, res, next) => {
@@ -13,6 +27,8 @@ function track(endpoint) {
 // This will periodically send metrics to Grafana
 const timer = setInterval(() => {
   Object.keys(requests).forEach((endpoint) => {
+    requests["memory"] = getMemoryUsagePercentage();
+    requests["cpu"] = getCpuUsagePercentage();
     sendMetricToGrafana("requests", requests[endpoint], { endpoint });
   });
 }, 10000);
