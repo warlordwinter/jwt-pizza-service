@@ -4,6 +4,9 @@ const orderRouter = require("./routes/orderRouter.js");
 const franchiseRouter = require("./routes/franchiseRouter.js");
 const version = require("./version.json");
 const config = require("./config.js");
+const metrics = require("./metrics.js");
+
+metrics.startSystemMetricsCollection();
 
 const app = express();
 app.use(express.json());
@@ -17,10 +20,11 @@ app.use((req, res, next) => {
 });
 
 const apiRouter = express.Router();
+
 app.use("/api", apiRouter);
-apiRouter.use("/auth", authRouter);
-apiRouter.use("/order", orderRouter);
-apiRouter.use("/franchise", franchiseRouter);
+apiRouter.use("/auth", metrics.track("auth"), authRouter);
+apiRouter.use("/order", metrics.track("order"), orderRouter);
+apiRouter.use("/franchise", metrics.track("franchise"), franchiseRouter);
 
 apiRouter.use("/docs", (req, res) => {
   res.json({
