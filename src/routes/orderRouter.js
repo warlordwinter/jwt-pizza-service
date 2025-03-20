@@ -3,7 +3,11 @@ const config = require("../config.js");
 const { Role, DB } = require("../database/database.js");
 const { authRouter } = require("./authRouter.js");
 const { asyncHandler, StatusCodeError } = require("../endpointHelper.js");
-const { trackRevenue, trackPizzaOrder } = require("../metrics.js");
+const {
+  trackRevenue,
+  trackPizzaOrder,
+  trackPizzaSales,
+} = require("../metrics.js");
 
 const orderRouter = express.Router();
 
@@ -141,6 +145,7 @@ orderRouter.post(
 
       if (r.ok) {
         trackPizzaOrder(true); // Track successful order
+        trackPizzaSales(orderReq.items, true); // Track successful pizza sales
         res.send({
           order,
           reportSlowPizzaToFactoryUrl: j.reportUrl,
@@ -148,6 +153,7 @@ orderRouter.post(
         });
       } else {
         trackPizzaOrder(false); // Track failed order
+        trackPizzaSales(orderReq.items, false); // Track failed pizza creations
         res.status(500).send({
           message: "Failed to fulfill order at factory",
           reportPizzaCreationErrorToPizzaFactoryUrl: j.reportUrl,
@@ -155,6 +161,7 @@ orderRouter.post(
       }
     } catch (error) {
       trackPizzaOrder(false); // Track failed order due to exception
+      trackPizzaSales(orderReq.items, false); // Track failed pizza creations
       throw error;
     }
   })

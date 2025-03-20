@@ -125,8 +125,6 @@ const revenueMetrics = {
 };
 
 function trackRevenue(items) {
-  console.log("Tracking revenue for items:", JSON.stringify(items, null, 2));
-
   if (!items || !Array.isArray(items)) {
     console.error("Invalid items array passed to trackRevenue");
     return;
@@ -137,7 +135,6 @@ function trackRevenue(items) {
       console.error("Invalid item or price:", item);
       return total;
     }
-    console.log(`Adding item price: ${item.price}`);
     return (total + item.price) * 100;
   }, 0);
 
@@ -192,6 +189,36 @@ function trackPizzaOrder(success) {
   }
 }
 
+// Add after pizzaOrderMetrics
+const pizzaMetrics = {
+  totalPizzasSold: 0,
+  pizzaCreationFailures: 0,
+  pizzasByType: {}, // Track count by pizza type
+};
+
+function trackPizzaSales(items, success) {
+  if (!items || !Array.isArray(items)) {
+    console.error("Invalid items array passed to trackPizzaSales");
+    return;
+  }
+
+  const pizzaCount = items.length;
+
+  if (success) {
+    pizzaMetrics.totalPizzasSold += pizzaCount;
+    // Track by pizza type
+    items.forEach((item) => {
+      if (item.description) {
+        pizzaMetrics.pizzasByType[item.description] =
+          (pizzaMetrics.pizzasByType[item.description] || 0) + 1;
+      }
+    });
+  } else {
+    pizzaMetrics.pizzaCreationFailures += pizzaCount;
+    console.log(`Failed to create ${pizzaCount} pizzas`);
+  }
+}
+
 // Function to collect and send system metrics
 function startSystemMetricsCollection(interval = 10000) {
   // Reset counts every 60 seconds
@@ -229,6 +256,31 @@ function startSystemMetricsCollection(interval = 10000) {
         type: "orders",
         status: "success",
       });
+
+      // Send pizza sales metrics
+      sendMetricToGrafana("pizzas_sold_total", pizzaMetrics.totalPizzasSold, {
+        type: "sales",
+        metric: "total_pizzas",
+      });
+
+      sendMetricToGrafana(
+        "pizzas_creation_failures",
+        pizzaMetrics.pizzaCreationFailures,
+        {
+          type: "sales",
+          metric: "creation_failures",
+        }
+      );
+
+      // Send metrics for each pizza type
+      Object.entries(pizzaMetrics.pizzasByType).forEach(
+        ([pizzaType, count]) => {
+          sendMetricToGrafana("pizzas_sold_by_type", count, {
+            type: "sales",
+            pizza_type: pizzaType,
+          });
+        }
+      );
 
       sendMetricToGrafana("pizza_orders_failure", pizzaOrderMetrics.failure, {
         type: "orders",
@@ -305,9 +357,6 @@ function startSystemMetricsCollection(interval = 10000) {
 
 function sendMetricToGrafana(metricName, metricValue, attributes) {
   const intValue = Math.round(Number(metricValue));
-  console.log(
-    `Preparing to send metric: ${metricName} with value: ${metricValue}`
-  );
 
   attributes = { ...attributes, source: config.metrics.source };
 
@@ -347,8 +396,6 @@ function sendMetricToGrafana(metricName, metricValue, attributes) {
       }
     );
   });
-
-  console.log("Sending metric payload:", JSON.stringify(metric, null, 2));
 
   fetch(`${config.metrics.url}`, {
     method: "POST",
@@ -394,5 +441,10 @@ module.exports = {
   updateAvailableEndpoints,
   trackRevenue,
   trackPizzaOrder,
-  getPizzaOrderMetrics: () => ({ ...pizzaOrderMetrics }),
+  trackPizzaSales,
+  getPizzaMetrics: () => ({
+    totalSold: pizzaMetrics.totalPizzasSold,
+    creationFailures: pizzaMetrics.pizzaCreationFailures,
+    byType: { ...pizzaMetrics.pizzasByType },
+  }),
 };
