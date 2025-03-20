@@ -15,17 +15,15 @@ let lastCpuInfo = os.cpus();
 const requestTracker = (req, res, next) => {
   // Track method counts
   const method = req.method.toUpperCase();
-  if (methodCounts.hasOwnProperty(method)) {
+  if (Object.prototype.hasOwnProperty.call(methodCounts, method)) {
     incrementMethodCount(method);
-    console.log(`Global request tracked: ${method} ${req.path}`);
   }
 
   // Track endpoint-specific requests
-  const endpoint = req.path.split("/")[2]; // Gets 'auth', 'order', or 'franchise' from /api/[endpoint]
-  if (endpoint) {
-    requests[endpoint] = (requests[endpoint] || 0) + 1;
+  const endpointPath = req.path.split("/")[2]; // Gets 'auth', 'order', or 'franchise' from /api/[endpoint]
+  if (endpointPath) {
+    requests[endpointPath] = (requests[endpointPath] || 0) + 1;
     requests["total"] = (requests["total"] || 0) + 1;
-    console.log(`Endpoint tracked: ${endpoint}, count: ${requests[endpoint]}`);
   }
 
   // Track response completion
@@ -68,9 +66,8 @@ function getMethodCounts() {
 }
 
 function incrementMethodCount(method) {
-  if (methodCounts.hasOwnProperty(method)) {
+  if (Object.prototype.hasOwnProperty.call(methodCounts, method)) {
     methodCounts[method]++;
-    console.log(`Incremented ${method} count to ${methodCounts[method]}`);
   }
 }
 
@@ -115,7 +112,6 @@ function getCpuUsagePercentage() {
 
   // Update last values for next calculation
   lastCpuInfo = currentCpuInfo;
-  lastCpuInfoTime = currentTime;
 
   return Math.round(totalUsage / currentCpuInfo.length);
 }
