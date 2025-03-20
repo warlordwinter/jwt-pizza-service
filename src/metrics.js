@@ -237,6 +237,20 @@ function trackPizzaCreationLatency(startTime, endTime) {
   );
 }
 
+const serviceLatency = {
+  average: 0,
+  count: 0,
+};
+
+function trackServiceLatency(startTime, endTime) {
+  const latency = endTime - startTime;
+  serviceLatency.count++;
+  serviceLatency.average = Math.round(
+    (serviceLatency.average * (serviceLatency.count - 1) + latency) /
+      serviceLatency.count
+  );
+}
+
 // Function to collect and send system metrics
 function startSystemMetricsCollection(interval = 10000) {
   // Reset counts every 60 seconds
@@ -252,6 +266,12 @@ function startSystemMetricsCollection(interval = 10000) {
       sendMetricToGrafana("system_cpu_usage", systemMetrics.cpu, {
         unit: "percentage",
         type: "system",
+      });
+
+      // Send service latency metrics
+      sendMetricToGrafana("API_Latency", serviceLatency.average, {
+        type: "latency",
+        unit: "milliseconds",
       });
 
       // Send Memory metric
@@ -476,4 +496,5 @@ module.exports = {
     byType: { ...pizzaMetrics.pizzasByType },
   }),
   trackPizzaCreationLatency,
+  trackServiceLatency,
 };

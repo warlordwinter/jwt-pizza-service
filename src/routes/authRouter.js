@@ -65,12 +65,15 @@ async function setAuthUser(req, res, next) {
   const token = readAuthToken(req);
   if (token) {
     try {
+      const startTime = new Date();
       if (await DB.isLoggedIn(token)) {
         // Check the database to make sure the token is valid.
         req.user = jwt.verify(token, config.jwtSecret);
         req.user.isRole = (role) =>
           !!req.user.roles.find((r) => r.role === role);
       }
+      const endTime = new Date();
+      metrics.trackServiceLatency(startTime, endTime);
     } catch {
       req.user = null;
     }
@@ -80,9 +83,12 @@ async function setAuthUser(req, res, next) {
 
 // Authenticate token
 authRouter.authenticateToken = (req, res, next) => {
+  const startTime = new Date();
   if (!req.user) {
     return res.status(401).send({ message: "unauthorized" });
   }
+  const endTime = new Date();
+  metrics.trackServiceLatency(startTime, endTime);
   next();
 };
 
@@ -90,6 +96,7 @@ authRouter.authenticateToken = (req, res, next) => {
 authRouter.post(
   "/",
   asyncHandler(async (req, res) => {
+    const startTime = new Date();
     const { name, email, password } = req.body;
     if (!name || !email || !password) {
       return res
@@ -103,6 +110,8 @@ authRouter.post(
       roles: [{ role: Role.Diner }],
     });
     const auth = await setAuth(user);
+    const endTime = new Date();
+    metrics.trackServiceLatency(startTime, endTime);
     res.json({ user: user, token: auth });
   })
 );
@@ -113,8 +122,11 @@ authRouter.put(
   asyncHandler(async (req, res) => {
     const { email, password } = req.body;
     try {
+      const startTime = new Date();
       const user = await DB.getUser(email, password);
       const auth = await setAuth(user);
+      const endTime = new Date();
+      metrics.trackServiceLatency(startTime, endTime);
       metrics.incrementAuthenticationCount(true);
       metrics.trackUserActivity(user.id, true);
       res.json({ user: user, token: auth });
@@ -130,8 +142,11 @@ authRouter.delete(
   "/",
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
+    const startTime = new Date();
     metrics.trackUserActivity(req.user.id, false);
     await clearAuth(req);
+    const endTime = new Date();
+    metrics.trackServiceLatency(startTime, endTime);
     res.json({ message: "logout successful" });
   })
 );
@@ -141,6 +156,7 @@ authRouter.put(
   "/:userId",
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
+    const startTime = new Date();
     const { email, password } = req.body;
     const userId = Number(req.params.userId);
     const user = req.user;
@@ -149,28 +165,39 @@ authRouter.put(
     }
 
     const updatedUser = await DB.updateUser(userId, email, password);
+    const endTime = new Date();
+    metrics.trackServiceLatency(startTime, endTime);
     res.json(updatedUser);
   })
 );
 
 async function setAuth(user) {
+  const startTime = new Date();
   const token = jwt.sign(user, config.jwtSecret);
+  const endTime = new Date();
+  metrics.trackServiceLatency(startTime, endTime);
   await DB.loginUser(user.id, token);
   return token;
 }
 
 async function clearAuth(req) {
+  const startTime = new Date();
   const token = readAuthToken(req);
   if (token) {
     await DB.logoutUser(token);
   }
+  const endTime = new Date();
+  metrics.trackServiceLatency(startTime, endTime);
 }
 
 function readAuthToken(req) {
+  const startTime = new Date();
   const authHeader = req.headers.authorization;
   if (authHeader) {
     return authHeader.split(" ")[1];
   }
+  const endTime = new Date();
+  metrics.trackServiceLatency(startTime, endTime);
   return null;
 }
 

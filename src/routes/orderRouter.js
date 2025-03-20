@@ -8,6 +8,7 @@ const {
   trackPizzaOrder,
   trackPizzaSales,
   trackPizzaCreationLatency,
+  trackServiceLatency,
 } = require("../metrics.js");
 
 const orderRouter = express.Router();
@@ -86,7 +87,11 @@ orderRouter.endpoints = [
 orderRouter.get(
   "/menu",
   asyncHandler(async (req, res) => {
-    res.send(await DB.getMenu());
+    const startTime = new Date();
+    const menu = await DB.getMenu();
+    const endTime = new Date();
+    trackServiceLatency(startTime, endTime);
+    res.send(menu);
   })
 );
 
@@ -95,16 +100,18 @@ orderRouter.put(
   "/menu",
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
-    const start = new Date();
+    const startTime = new Date();
     if (!req.user.isRole(Role.Admin)) {
       throw new StatusCodeError("unable to add menu item", 403);
     }
 
     const addMenuItemReq = req.body;
     await DB.addMenuItem(addMenuItemReq);
-    const end = new Date();
-    trackPizzaCreationLatency(start, end);
-    res.send(await DB.getMenu());
+    const menu = await DB.getMenu();
+    const endTime = new Date();
+    trackServiceLatency(startTime, endTime);
+    trackPizzaCreationLatency(startTime, endTime);
+    res.send(menu);
   })
 );
 
@@ -113,7 +120,11 @@ orderRouter.get(
   "/",
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
-    res.json(await DB.getOrders(req.user, req.query.page));
+    const startTime = new Date();
+    const orders = await DB.getOrders(req.user, req.query.page);
+    const endTime = new Date();
+    trackServiceLatency(startTime, endTime);
+    res.json(orders);
   })
 );
 
@@ -122,6 +133,7 @@ orderRouter.post(
   "/",
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
+    const startTime = new Date();
     const orderReq = req.body;
     const order = await DB.addDinerOrder(req.user, orderReq);
     trackRevenue(orderReq.items);
@@ -145,24 +157,30 @@ orderRouter.post(
       const j = await r.json();
 
       if (r.ok) {
-        trackPizzaOrder(true); // Track successful order
-        trackPizzaSales(orderReq.items, true); // Track successful pizza sales
+        trackPizzaOrder(true);
+        trackPizzaSales(orderReq.items, true);
+        const endTime = new Date();
+        trackServiceLatency(startTime, endTime);
         res.send({
           order,
           reportSlowPizzaToFactoryUrl: j.reportUrl,
           jwt: j.jwt,
         });
       } else {
-        trackPizzaOrder(false); // Track failed order
-        trackPizzaSales(orderReq.items, false); // Track failed pizza creations
+        trackPizzaOrder(false);
+        trackPizzaSales(orderReq.items, false);
+        const endTime = new Date();
+        trackServiceLatency(startTime, endTime);
         res.status(500).send({
           message: "Failed to fulfill order at factory",
           reportPizzaCreationErrorToPizzaFactoryUrl: j.reportUrl,
         });
       }
     } catch (error) {
-      trackPizzaOrder(false); // Track failed order due to exception
-      trackPizzaSales(orderReq.items, false); // Track failed pizza creations
+      trackPizzaOrder(false);
+      trackPizzaSales(orderReq.items, false);
+      const endTime = new Date();
+      trackServiceLatency(startTime, endTime);
       throw error;
     }
   })
