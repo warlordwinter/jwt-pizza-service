@@ -219,6 +219,24 @@ function trackPizzaSales(items, success) {
   }
 }
 
+const pizzaCreationLatency = {
+  average: 0,
+  count: 0,
+};
+
+function trackPizzaCreationLatency(startTime, endTime) {
+  const latency = endTime - startTime;
+  pizzaCreationLatency.count++;
+  pizzaCreationLatency.average = Math.round(
+    (pizzaCreationLatency.average * (pizzaCreationLatency.count - 1) +
+      latency) /
+      pizzaCreationLatency.count
+  );
+  console.log(
+    `Pizza creation latency: ${latency}ms, Average: ${pizzaCreationLatency.average}ms`
+  );
+}
+
 // Function to collect and send system metrics
 function startSystemMetricsCollection(interval = 10000) {
   // Reset counts every 60 seconds
@@ -248,6 +266,16 @@ function startSystemMetricsCollection(interval = 10000) {
         revenueMetrics.totalRevenue,
         {
           type: "revenue",
+        }
+      );
+
+      // Send pizza creation latency
+      sendMetricToGrafana(
+        "pizza_creation_latency_ms",
+        pizzaCreationLatency.average,
+        {
+          type: "latency",
+          unit: "milliseconds",
         }
       );
 
@@ -447,4 +475,5 @@ module.exports = {
     creationFailures: pizzaMetrics.pizzaCreationFailures,
     byType: { ...pizzaMetrics.pizzasByType },
   }),
+  trackPizzaCreationLatency,
 };

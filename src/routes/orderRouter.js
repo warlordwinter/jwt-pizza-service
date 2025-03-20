@@ -7,6 +7,7 @@ const {
   trackRevenue,
   trackPizzaOrder,
   trackPizzaSales,
+  trackPizzaCreationLatency,
 } = require("../metrics.js");
 
 const orderRouter = express.Router();
@@ -93,16 +94,16 @@ orderRouter.get(
 orderRouter.put(
   "/menu",
   authRouter.authenticateToken,
-  // const start = new Date();
   asyncHandler(async (req, res) => {
+    const start = new Date();
     if (!req.user.isRole(Role.Admin)) {
       throw new StatusCodeError("unable to add menu item", 403);
     }
 
     const addMenuItemReq = req.body;
     await DB.addMenuItem(addMenuItemReq);
-    // const end = new Date();
-
+    const end = new Date();
+    trackPizzaCreationLatency(start, end);
     res.send(await DB.getMenu());
   })
 );
