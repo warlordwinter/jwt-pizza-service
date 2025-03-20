@@ -20,6 +20,14 @@ const requestTracker = (req, res, next) => {
     console.log(`Global request tracked: ${method} ${req.path}`);
   }
 
+  // Track endpoint-specific requests
+  const endpoint = req.path.split("/")[2]; // Gets 'auth', 'order', or 'franchise' from /api/[endpoint]
+  if (endpoint) {
+    requests[endpoint] = (requests[endpoint] || 0) + 1;
+    requests["total"] = (requests["total"] || 0) + 1;
+    console.log(`Endpoint tracked: ${endpoint}, count: ${requests[endpoint]}`);
+  }
+
   // Track response completion
   res.on("finish", () => {
     console.log(`Request completed: ${method} ${req.path} ${res.statusCode}`);
@@ -35,15 +43,9 @@ function updateAvailableEndpoints(router, count) {
   availableEndpoints[router] = count;
 }
 
+// Remove the separate track function since it's now handled in requestTracker
 function track(endpoint) {
-  return (req, res, next) => {
-    // Only track endpoint-specific requests, method counting is now handled globally
-    requests[endpoint] = (requests[endpoint] || 0) + 1;
-    requests["total"] = (requests["total"] || 0) + 1;
-    // console.log(`Endpoint tracked: ${endpoint}, count: ${requests[endpoint]}`);
-    console.log(`Total requests: ${requests["total"]}`);
-    next();
-  };
+  return (req, res, next) => next();
 }
 
 const methodCounts = {
@@ -118,6 +120,33 @@ function getCpuUsagePercentage() {
   return Math.round(totalUsage / currentCpuInfo.length);
 }
 
+const revenueMetrics = {
+  totalRevenue: 0,
+};
+
+function trackRevenue(items) {
+  console.log("Tracking revenue for items:", JSON.stringify(items, null, 2));
+
+  if (!items || !Array.isArray(items)) {
+    console.error("Invalid items array passed to trackRevenue");
+    return;
+  }
+
+  const orderRevenue = items.reduce((total, item) => {
+    if (!item || typeof item.price !== "number") {
+      console.error("Invalid item or price:", item);
+      return total;
+    }
+    console.log(`Adding item price: ${item.price}`);
+    return (total + item.price) * 100;
+  }, 0);
+
+  revenueMetrics.totalRevenue += orderRevenue;
+  console.log(
+    `Order revenue: ${orderRevenue}, New total revenue: ${revenueMetrics.totalRevenue}`
+  );
+}
+
 function getMemoryUsagePercentage() {
   const totalMemory = os.totalmem();
   const freeMemory = os.freemem();
@@ -142,6 +171,27 @@ function trackUserActivity(userId, isActive) {
   console.log(`Active users count: ${userMetrics.totalActiveCount}`);
 }
 
+const pizzaOrderMetrics = {
+  success: 0,
+  failure: 0,
+  total: 0,
+};
+
+function trackPizzaOrder(success) {
+  pizzaOrderMetrics.total++;
+  if (success) {
+    pizzaOrderMetrics.success++;
+    console.log(
+      `Pizza order success. Total successful orders: ${pizzaOrderMetrics.success}`
+    );
+  } else {
+    pizzaOrderMetrics.failure++;
+    console.log(
+      `Pizza order failure. Total failed orders: ${pizzaOrderMetrics.failure}`
+    );
+  }
+}
+
 // Function to collect and send system metrics
 function startSystemMetricsCollection(interval = 10000) {
   // Reset counts every 60 seconds
@@ -163,6 +213,31 @@ function startSystemMetricsCollection(interval = 10000) {
       sendMetricToGrafana("system_memory_usage", systemMetrics.memory, {
         unit: "percentage",
         type: "system",
+      });
+
+      // Send revenue metrics
+      sendMetricToGrafana(
+        "pizza_service_revenue_total",
+        revenueMetrics.totalRevenue,
+        {
+          type: "revenue",
+        }
+      );
+
+      // Send pizza order metrics
+      sendMetricToGrafana("pizza_orders_success", pizzaOrderMetrics.success, {
+        type: "orders",
+        status: "success",
+      });
+
+      sendMetricToGrafana("pizza_orders_failure", pizzaOrderMetrics.failure, {
+        type: "orders",
+        status: "failure",
+      });
+
+      sendMetricToGrafana("pizza_orders_total", pizzaOrderMetrics.total, {
+        type: "orders",
+        status: "total",
       });
 
       // Send active users metric
@@ -230,6 +305,9 @@ function startSystemMetricsCollection(interval = 10000) {
 
 function sendMetricToGrafana(metricName, metricValue, attributes) {
   const intValue = Math.round(Number(metricValue));
+  console.log(
+    `Preparing to send metric: ${metricName} with value: ${metricValue}`
+  );
 
   attributes = { ...attributes, source: config.metrics.source };
 
@@ -270,6 +348,8 @@ function sendMetricToGrafana(metricName, metricValue, attributes) {
     );
   });
 
+  console.log("Sending metric payload:", JSON.stringify(metric, null, 2));
+
   fetch(`${config.metrics.url}`, {
     method: "POST",
     body: JSON.stringify(metric),
@@ -281,7 +361,9 @@ function sendMetricToGrafana(metricName, metricValue, attributes) {
     .then((response) => {
       if (!response.ok) {
         console.error(
-          `Failed to push metrics data to Grafana for ${metricName}`
+          `Failed to push metrics data to Grafana for ${metricName}:`,
+          response.status,
+          response.statusText
         );
       } else {
         console.log(
@@ -310,4 +392,7 @@ module.exports = {
   }),
   getAuthMetrics: () => ({ ...authenticationCounts }),
   updateAvailableEndpoints,
+  trackRevenue,
+  trackPizzaOrder,
+  getPizzaOrderMetrics: () => ({ ...pizzaOrderMetrics }),
 };

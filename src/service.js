@@ -31,9 +31,9 @@ app.use((req, res, next) => {
 const apiRouter = express.Router();
 
 app.use("/api", apiRouter);
-apiRouter.use("/auth", metrics.track("auth"), authRouter);
-apiRouter.use("/order", metrics.track("order"), orderRouter);
-apiRouter.use("/franchise", metrics.track("franchise"), franchiseRouter);
+apiRouter.use("/auth", authRouter);
+apiRouter.use("/order", orderRouter);
+apiRouter.use("/franchise", franchiseRouter);
 
 apiRouter.use("/docs", (req, res) => {
   res.json({
