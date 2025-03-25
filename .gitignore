@@ -6,3 +6,4 @@ coverage
 dist
 secrets.txt
 keys.txt
+generateLogs.sh
