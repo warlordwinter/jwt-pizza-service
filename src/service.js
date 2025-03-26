@@ -5,6 +5,7 @@ const franchiseRouter = require("./routes/franchiseRouter.js");
 const version = require("./version.json");
 const config = require("./config.js");
 const metrics = require("./metrics.js");
+const logger = require("./logger.js");
 
 metrics.startSystemMetricsCollection();
 
@@ -17,6 +18,9 @@ const app = express();
 
 // Add request tracking middleware early to catch ALL requests
 app.use(metrics.requestTracker);
+
+// Add logging middleware before other middleware to catch all requests
+app.use(logger.httpLogger);
 
 app.use(express.json());
 app.use(setAuthUser);
@@ -62,6 +66,20 @@ app.use("*", (req, res) => {
 
 // Default error handler for all exceptions and errors.
 app.use((err, req, res, next) => {
+  logger.log("error", "application", {
+    error: {
+      message: err.message,
+      stack: err.stack,
+      code: err.code,
+      name: err.name,
+    },
+    request: {
+      method: req.method,
+      path: req.originalUrl,
+      query: req.query,
+      body: req.body,
+    },
+  });
   res
     .status(err.statusCode ?? 500)
     .json({ message: err.message, stack: err.stack });
