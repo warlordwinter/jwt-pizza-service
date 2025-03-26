@@ -10,8 +10,10 @@ const {
   trackPizzaCreationLatency,
   trackServiceLatency,
 } = require("../metrics.js");
+const Logger = require("../logger.js");
 
 const orderRouter = express.Router();
+const logger = new Logger(config);
 
 orderRouter.endpoints = [
   {
@@ -136,6 +138,11 @@ orderRouter.post(
     const startTime = new Date();
     const orderReq = req.body;
     const order = await DB.addDinerOrder(req.user, orderReq);
+    const orderInfo = {
+      diner: { id: req.user.id, name: req.user.name, email: req.user.email },
+      order,
+    };
+    logger.factoryLogger(orderInfo);
     trackRevenue(orderReq.items);
 
     try {

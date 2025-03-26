@@ -28,7 +28,7 @@ const requestTracker = (req, res, next) => {
 
   // Track response completion
   res.on("finish", () => {
-    console.log(`Request completed: ${method} ${req.path} ${res.statusCode}`);
+    // console.log(`Request completed: ${method} ${req.path} ${res.statusCode}`);
   });
 
   next();
@@ -58,7 +58,7 @@ function resetMethodCounts() {
   methodCounts.POST = 0;
   methodCounts.PUT = 0;
   methodCounts.DELETE = 0;
-  console.log("Method counts reset:", methodCounts);
+  // console.log("Method counts reset:", methodCounts);
 }
 
 function getMethodCounts() {
@@ -81,14 +81,14 @@ function incrementAuthenticationCount(success) {
   authenticationCounts.total++;
   if (success) {
     authenticationCounts.success++;
-    console.log(
-      `Authentication success. Total successes: ${authenticationCounts.success}`
-    );
+    // console.log(
+    //   `Authentication success. Total successes: ${authenticationCounts.success}`
+    // );
   } else {
     authenticationCounts.failure++;
-    console.log(
-      `Authentication failure. Total failures: ${authenticationCounts.failure}`
-    );
+    // console.log(
+    //   `Authentication failure. Total failures: ${authenticationCounts.failure}`
+    // );
   }
 }
 
@@ -122,22 +122,22 @@ const revenueMetrics = {
 
 function trackRevenue(items) {
   if (!items || !Array.isArray(items)) {
-    console.error("Invalid items array passed to trackRevenue");
+    // console.error("Invalid items array passed to trackRevenue");
     return;
   }
 
   const orderRevenue = items.reduce((total, item) => {
     if (!item || typeof item.price !== "number") {
-      console.error("Invalid item or price:", item);
+      // console.error("Invalid item or price:", item);
       return total;
     }
     return (total + item.price) * 100;
   }, 0);
 
   revenueMetrics.totalRevenue += orderRevenue;
-  console.log(
-    `Order revenue: ${orderRevenue}, New total revenue: ${revenueMetrics.totalRevenue}`
-  );
+  // console.log(
+  //   `Order revenue: ${orderRevenue}, New total revenue: ${revenueMetrics.totalRevenue}`
+  // );
 }
 
 function getMemoryUsagePercentage() {
@@ -161,7 +161,7 @@ function trackUserActivity(userId, isActive) {
     userMetrics.activeUsers.delete(userId);
   }
   userMetrics.totalActiveCount = userMetrics.activeUsers.size;
-  console.log(`Active users count: ${userMetrics.totalActiveCount}`);
+  // console.log(`Active users count: ${userMetrics.totalActiveCount}`);
 }
 
 const pizzaOrderMetrics = {
@@ -174,14 +174,14 @@ function trackPizzaOrder(success) {
   pizzaOrderMetrics.total++;
   if (success) {
     pizzaOrderMetrics.success++;
-    console.log(
-      `Pizza order success. Total successful orders: ${pizzaOrderMetrics.success}`
-    );
+    // console.log(
+    //   `Pizza order success. Total successful orders: ${pizzaOrderMetrics.success}`
+    // );
   } else {
     pizzaOrderMetrics.failure++;
-    console.log(
-      `Pizza order failure. Total failed orders: ${pizzaOrderMetrics.failure}`
-    );
+    // console.log(
+    //   `Pizza order failure. Total failed orders: ${pizzaOrderMetrics.failure}`
+    // );
   }
 }
 
@@ -194,7 +194,7 @@ const pizzaMetrics = {
 
 function trackPizzaSales(items, success) {
   if (!items || !Array.isArray(items)) {
-    console.error("Invalid items array passed to trackPizzaSales");
+    // console.error("Invalid items array passed to trackPizzaSales");
     return;
   }
 
@@ -211,7 +211,7 @@ function trackPizzaSales(items, success) {
     });
   } else {
     pizzaMetrics.pizzaCreationFailures += pizzaCount;
-    console.log(`Failed to create ${pizzaCount} pizzas`);
+    // console.log(`Failed to create ${pizzaCount} pizzas`);
   }
 }
 
@@ -228,9 +228,9 @@ function trackPizzaCreationLatency(startTime, endTime) {
       latency) /
       pizzaCreationLatency.count
   );
-  console.log(
-    `Pizza creation latency: ${latency}ms, Average: ${pizzaCreationLatency.average}ms`
-  );
+  // console.log(
+  //   `Pizza creation latency: ${latency}ms, Average: ${pizzaCreationLatency.average}ms`
+  // );
 }
 
 const serviceLatency = {
@@ -368,7 +368,7 @@ function startSystemMetricsCollection(interval = 10000) {
       // Send method-specific metrics with current counts
       const currentCounts = getMethodCounts();
       Object.entries(currentCounts).forEach(([method, count]) => {
-        console.log(`Sending ${method} count:`, count);
+        // console.log(`Sending ${method} count:`, count);
         sendMetricToGrafana("http_method_requests", count, {
           method: method,
           type: "method",
@@ -394,7 +394,7 @@ function startSystemMetricsCollection(interval = 10000) {
         });
       });
     } catch (error) {
-      console.error("Error collecting metrics:", error.message);
+      // console.error("Error collecting metrics:", error.message);
     }
   }, interval);
 }
@@ -451,15 +451,15 @@ function sendMetricToGrafana(metricName, metricValue, attributes) {
   })
     .then((response) => {
       if (!response.ok) {
-        console.error(
-          `Failed to push metrics data to Grafana for ${metricName}:`,
-          response.status,
-          response.statusText
-        );
+        // console.error(
+        //   `Failed to push metrics data to Grafana for ${metricName}:`,
+        //   response.status,
+        //   response.statusText
+        // );
       } else {
-        console.log(
-          `Successfully pushed ${metricName} with value ${metricValue}`
-        );
+        // console.log(
+        //   `Successfully pushed ${metricName} with value ${metricValue}`
+        // );
       }
     })
     .catch((error) => {
