@@ -7,3 +7,4 @@ dist
 secrets.txt
 keys.txt
 generateLogs.sh
+grafanaAnotation.sh
