@@ -174,6 +174,7 @@ orderRouter.post(
       const j = await r.json();
 
       if (r.ok) {
+        console.log("successful order Logs");
         trackPizzaOrder(true);
         trackPizzaSales(orderReq.items, true);
         const endTime = new Date();
@@ -184,6 +185,7 @@ orderRouter.post(
           jwt: j.jwt,
         });
       } else {
+        console.log("unsuccessful order Logs");
         trackPizzaOrder(false);
         trackPizzaSales(orderReq.items, false);
         const endTime = new Date();
@@ -209,6 +211,7 @@ orderRouter.put(
   "/chaos/:state",
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
+    console.log("Order Router Chaos Test was triggered");
     if (req.user.isRole(Role.Admin)) {
       enableChaos = req.params.state === "true";
     }

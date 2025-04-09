@@ -8,3 +8,4 @@ secrets.txt
 keys.txt
 generateLogs.sh
 grafanaAnotation.sh
+chaosScript.sh
