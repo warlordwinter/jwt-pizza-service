@@ -53,10 +53,10 @@ while true; do
   echo "Login diner..."
   curl -s -X POST $host/api/order -H 'Content-Type: application/json' -d '{"franchiseId": 1, "storeId":1, "items":[{ "menuId": 1, "description": "Veggie", "price": 0.05 }]}'  -H "Authorization: Bearer $token" > /dev/null
   echo "Bought a pizza..."
-  sleep 20
+  sleep 5
   curl -s -X DELETE $host/api/auth -H "Authorization: Bearer $token" > /dev/null
   echo "Logging out diner..."
-  sleep 30
+  sleep 10
 done &
 pid4=$!
 

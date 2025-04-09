@@ -179,14 +179,14 @@ orderRouter.post(
         trackPizzaSales(orderReq.items, true);
         const endTime = new Date();
         trackServiceLatency(startTime, endTime);
-        logger.factoryLogger(r);
+        logger.factoryLogger(r.body);
         res.send({
           order,
           reportSlowPizzaToFactoryUrl: j.reportUrl,
           jwt: j.jwt,
         });
       } else {
-        logger.factoryLogger(r);
+        logger.factoryLogger(r.body);
         console.log("unsuccessful order Logs");
         trackPizzaOrder(false);
         trackPizzaSales(orderReq.items, false);
