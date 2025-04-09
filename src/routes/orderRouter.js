@@ -152,7 +152,7 @@ orderRouter.post(
       diner: { id: req.user.id, name: req.user.name, email: req.user.email },
       order,
     };
-    logger.factoryLogger(orderInfo);
+    // logger.factoryLogger(orderInfo);
     trackRevenue(orderReq.items);
 
     try {
@@ -179,12 +179,14 @@ orderRouter.post(
         trackPizzaSales(orderReq.items, true);
         const endTime = new Date();
         trackServiceLatency(startTime, endTime);
+        logger.factoryLogger(r);
         res.send({
           order,
           reportSlowPizzaToFactoryUrl: j.reportUrl,
           jwt: j.jwt,
         });
       } else {
+        logger.factoryLogger(r);
         console.log("unsuccessful order Logs");
         trackPizzaOrder(false);
         trackPizzaSales(orderReq.items, false);
