@@ -137,6 +137,16 @@ orderRouter.post(
   asyncHandler(async (req, res) => {
     const startTime = new Date();
     const orderReq = req.body;
+
+    // Chaos monkey - randomly fail orders
+    if (enableChaos && Math.random() < 0.5) {
+      trackPizzaOrder(false);
+      trackPizzaSales(orderReq.items, false);
+      const endTime = new Date();
+      trackServiceLatency(startTime, endTime);
+      throw new StatusCodeError("Chaos monkey", 500);
+    }
+
     const order = await DB.addDinerOrder(req.user, orderReq);
     const orderInfo = {
       diner: { id: req.user.id, name: req.user.name, email: req.user.email },
@@ -190,6 +200,19 @@ orderRouter.post(
       trackServiceLatency(startTime, endTime);
       throw error;
     }
+  })
+);
+
+// Chaos monkey control endpoint
+let enableChaos = false;
+orderRouter.put(
+  "/chaos/:state",
+  authRouter.authenticateToken,
+  asyncHandler(async (req, res) => {
+    if (req.user.isRole(Role.Admin)) {
+      enableChaos = req.params.state === "true";
+    }
+    res.json({ chaos: enableChaos });
   })
 );
 
