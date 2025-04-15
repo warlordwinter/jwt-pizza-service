@@ -4,6 +4,7 @@ const config = require("../config.js");
 const { asyncHandler } = require("../endpointHelper.js");
 const { DB, Role } = require("../database/database.js");
 const metrics = require("../metrics.js");
+const bcrypt = require("bcrypt");
 
 const authRouter = express.Router();
 
@@ -123,7 +124,11 @@ authRouter.put(
     const { email, password } = req.body;
     try {
       const startTime = new Date();
-      const user = await DB.getUser(email, password);
+      // const user = await DB.getUserByEmail(email);
+      // if (!user || !(await bcrypt.compare(password, user.password))) {
+      //   metrics.incrementAuthenticationCount(false);
+      //   return res.status(401).json({ message: "Invalid email or password" });
+      // }
       const auth = await setAuth(user);
       const endTime = new Date();
       metrics.trackServiceLatency(startTime, endTime);
