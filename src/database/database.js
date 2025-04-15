@@ -10,6 +10,9 @@ class DB {
   constructor() {
     this.initialized = this.initializeDatabase();
     this.logger = new Logger(config);
+    this.maxLoginAttempts = 5;
+    this.loginAttempts = new Map();
+    this.validRoles = [Role.Diner, Role.Admin, Role.Franchisee];
   }
 
   async getMenu() {
@@ -39,9 +42,36 @@ class DB {
 
   async addUser(user) {
     const connection = await this.getConnection();
-
     try {
-      const hashedPassword = await bcrypt.hash(user.password, 10);
+      const existingUser = await this.query(
+        connection,
+        `SELECT id FROM user WHERE email = ?`,
+        [user.email]
+      );
+      if (existingUser.length > 0) {
+        throw new StatusCodeError("Email already exists", 400);
+      }
+
+      if (
+        !user.roles ||
+        !Array.isArray(user.roles) ||
+        user.roles.length === 0
+      ) {
+        throw new StatusCodeError("At least one role is required", 400);
+      }
+
+      const hasAdminRole = user.roles.some((role) => role.role === Role.Admin);
+      if (hasAdminRole) {
+        throw new StatusCodeError("Unauthorized role assignment", 403);
+      }
+
+      for (const role of user.roles) {
+        if (!this.validRoles.includes(role.role)) {
+          throw new StatusCodeError("Invalid role", 400);
+        }
+      }
+
+      const hashedPassword = await bcrypt.hash(user.password, 12);
 
       const userResult = await this.query(
         connection,
@@ -49,6 +79,7 @@ class DB {
         [user.name, user.email, hashedPassword]
       );
       const userId = userResult.insertId;
+
       for (const role of user.roles) {
         switch (role.role) {
           case Role.Franchisee: {
@@ -84,26 +115,33 @@ class DB {
   async getUser(email, password) {
     const connection = await this.getConnection();
     try {
+      await this.checkLoginAttempts(email);
+
       const userResult = await this.query(
         connection,
-        `SELECT * FROM user WHERE email=?`,
+        `SELECT * FROM user WHERE email = ?`,
         [email]
       );
       const user = userResult[0];
+
       if (!user || !(await bcrypt.compare(password, user.password))) {
-        throw new StatusCodeError("unknown user", 404);
+        throw new StatusCodeError("Invalid credentials", 401);
       }
 
       const roleResult = await this.query(
         connection,
-        `SELECT * FROM userRole WHERE userId=?`,
+        `SELECT * FROM userRole WHERE userId = ?`,
         [user.id]
       );
       const roles = roleResult.map((r) => {
         return { objectId: r.objectId || undefined, role: r.role };
       });
 
+      this.loginAttempts.delete(email);
+
       return { ...user, roles: roles, password: undefined };
+    } catch (error) {
+      throw error;
     } finally {
       connection.end();
     }
@@ -116,12 +154,22 @@ class DB {
       const values = [];
 
       if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          throw new StatusCodeError("Invalid email format", 400);
+        }
         fields.push("email = ?");
         values.push(email);
       }
 
       if (password) {
-        const hashedPassword = await bcrypt.hash(password, 10);
+        if (password.length < 8) {
+          throw new StatusCodeError(
+            "Password must be at least 8 characters",
+            400
+          );
+        }
+        const hashedPassword = await bcrypt.hash(password, 12);
         fields.push("password = ?");
         values.push(hashedPassword);
       }
@@ -417,7 +465,6 @@ class DB {
   }
 
   async getConnection() {
-    // Make sure the database is initialized before trying to get a connection.
     await this.initialized;
     return this._getConnection();
   }
@@ -487,6 +534,67 @@ class DB {
       [config.db.connection.database]
     );
     return rows.length > 0;
+  }
+
+  async checkLoginAttempts(email) {
+    const attempts = this.loginAttempts.get(email) || 0;
+    if (attempts >= this.maxLoginAttempts) {
+      throw new StatusCodeError(
+        "Too many login attempts. Please try again later.",
+        429
+      );
+    }
+    this.loginAttempts.set(email, attempts + 1);
+    setTimeout(() => {
+      const currentAttempts = this.loginAttempts.get(email);
+      if (currentAttempts) {
+        this.loginAttempts.set(email, currentAttempts - 1);
+      }
+    }, 15 * 60 * 1000);
+  }
+
+  // Track login attempts
+  trackLoginAttempt(email) {
+    if (!this.loginAttempts.has(email)) {
+      this.loginAttempts.set(email, {
+        attempts: 0,
+        lastAttempt: Date.now(),
+      });
+    }
+
+    const userAttempts = this.loginAttempts.get(email);
+    userAttempts.attempts++;
+    userAttempts.lastAttempt = Date.now();
+
+    // Reset attempts after 15 minutes
+    if (Date.now() - userAttempts.lastAttempt > 15 * 60 * 1000) {
+      userAttempts.attempts = 0;
+    }
+
+    return userAttempts.attempts >= this.maxLoginAttempts;
+  }
+
+  // Reset login attempts
+  resetLoginAttempts(email) {
+    if (this.loginAttempts.has(email)) {
+      this.loginAttempts.delete(email);
+    }
+  }
+
+  // Enhanced login method
+  async login(email, password) {
+    if (this.trackLoginAttempt(email)) {
+      throw new Error("Too many login attempts. Please try again later.");
+    }
+
+    const user = await this.getUser(email, password);
+    if (!user) {
+      throw new Error("Invalid credentials");
+    }
+
+    // Reset attempts on successful login
+    this.resetLoginAttempts(email);
+    return user;
   }
 }
 
